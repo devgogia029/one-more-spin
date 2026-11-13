@@ -148,7 +148,7 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: slot_machine_buttons-02_normal
+      name: slot_machine_buttons-02_norm
       rect:
         serializedVersion: 2
         x: 0
@@ -161,16 +161,16 @@ TextureImporter:
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 70b626ccb2435da10800000000000000
-      internalID: 1933508977742736135
+      spriteID: b0ef9901de5236141a58fe1f295fdf74
+      internalID: 1160972557
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: slot_machine_buttons-02_highlighted
+      name: slot_machine_buttons-02_high
       rect:
         serializedVersion: 2
         x: 0
@@ -183,10 +183,10 @@ TextureImporter:
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 0057422fe965729d0800000000000000
-      internalID: -2799173402720176896
+      spriteID: 7b46f82741517dc4e8b16c9c2b5ef0c6
+      internalID: -927840885
       vertices: []
       indices: 
       edges: []
@@ -196,7 +196,7 @@ TextureImporter:
       rect:
         serializedVersion: 2
         x: 0
-        y: 254
+        y: 256
         width: 256
         height: 256
       alignment: 0
@@ -205,9 +205,9 @@ TextureImporter:
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 796ffbca3df457ff0800000000000000
+      spriteID: 557588a50e092024491a706b9ddba0ea
       internalID: -39037251207825769
       vertices: []
       indices: 
@@ -227,9 +227,9 @@ TextureImporter:
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 86335c02947bb5e90800000000000000
+      spriteID: 348373394a644ce45a4a1f9552cd247a
       internalID: -7035828468125977752
       vertices: []
       indices: 
@@ -252,8 +252,8 @@ TextureImporter:
         value: '{"sliceOnImport":false,"gridCellCount":{"x":1.0,"y":4.0},"gridSpriteSize":{"x":256.0,"y":256.0},"gridSpriteOffset":{"x":0.0,"y":0.0},"gridSpritePadding":{"x":0.0,"y":0.0},"pivot":{"x":0.5,"y":0.5},"pivotPixels":{"x":0.0,"y":0.0},"autoSlicingMethod":0,"spriteAlignment":0,"pivotUnitMode":0,"slicingType":2,"keepEmptyRects":false,"isAlternate":false}'
     nameFileIdTable:
       slot_machine_buttons-02_disabled: -7035828468125977752
-      slot_machine_buttons-02_highlighted: -2799173402720176896
-      slot_machine_buttons-02_normal: 1933508977742736135
+      slot_machine_buttons-02_high: -927840885
+      slot_machine_buttons-02_norm: 1160972557
       slot_machine_buttons-02_pressed: -39037251207825769
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
