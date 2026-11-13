@@ -1,0 +1,266 @@
+using System.Collections;
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+
+public class SlotMachineManager : MonoBehaviour
+{
+    [Header("Game Settings")]
+
+    public int startingBalance = 1000; //number of coins the player starts with
+    public int minimumBet = 10; //smallest amount the player can bet
+    public int maximumBet = 100; //largest amount the player can bet
+    public int betStep = 10; //amount added or removed whenever the player changes the bet
+
+    [Header("Slot Symbols")]
+
+    public Sprite[] symbols; //stores the four slot symbols in the correct order: 7, Cherries, Bell, BAR
+    public string[] symbolNames = { "7", "Cherries", "Bell", "BAR" }; //stores the names used when displaying the winning result
+    public int[] payoutMultipliers = { 10, 5, 3, 2 }; //stores the payout multiplier for each symbol in the same order
+
+    [Header("Reels")]
+
+    public SlotReel[] reels; //stores references to the three reels in the scene
+
+    [Header("UI References")]
+
+    public TMP_Text balanceText; //reference to the text that displays the player's balance
+    public TMP_Text betText; //reference to the text that displays the current bet
+    public TMP_Text resultText; //reference to the text that displays wins and losses
+
+    public Button spinButton; //reference to the Spin button
+    public Button increaseBetButton; //reference to the button that increases the bet
+    public Button decreaseBetButton; //reference to the button that decreases the bet
+
+    private int balance; //stores the player's current balance
+    private int currentBet; //stores the amount the player has selected to bet
+    private bool isGameRunning; //true while the reels are spinning; false when the game is ready for another spin
+
+    void Start()
+    {
+        if (!CheckSetup()) //checks whether all the required objects and settings have been assigned
+        {
+            enabled = false; //disables this script if something important is missing
+            return; //stops the rest of Start so the game does not run with an incomplete setup
+        }
+
+        balance = startingBalance; //sets the player's balance to the starting amount
+
+        currentBet = minimumBet; //starts the player at the minimum bet
+
+        for (int i = 0; i < reels.Length; i++) //goes through all three reels
+        {
+            reels[i].Initialize(symbols); //gives each reel the four symbols and creates its scrolling strip
+        }
+
+        spinButton.onClick.AddListener(Spin); //calls Spin whenever the player clicks the Spin button
+
+        increaseBetButton.onClick.AddListener(IncreaseBet); //calls IncreaseBet whenever the player clicks the increase button
+
+        decreaseBetButton.onClick.AddListener(DecreaseBet); //calls DecreaseBet whenever the player clicks the decrease button
+
+        resultText.text = "Place your bet and spin!"; //displays the starting message
+
+        UpdateUI(); //updates the balance, bet and button states when the game starts
+    }
+
+    bool CheckSetup()
+    {
+        if (startingBalance < minimumBet) //checks whether the starting balance is enough to place the minimum bet
+        {
+            Debug.LogError("Starting balance must be at least the minimum bet."); //shows an error if the starting balance is too low
+            return false; //stops the game setup
+        }
+
+        if (minimumBet <= 0 || maximumBet < minimumBet || betStep <= 0) //checks whether the bet settings make sense
+        {
+            Debug.LogError("Check your minimum bet, maximum bet and bet step settings."); //shows an error if the bet settings are incorrect
+            return false; //stops the game setup
+        }
+
+        if (symbols == null || symbols.Length != 4) //checks whether exactly four symbols have been assigned
+        {
+            Debug.LogError("Assign exactly four symbols to the Game Manager."); //shows an error if the symbol array is incorrect
+            return false; //stops the game setup
+        }
+
+        if (symbolNames == null || symbolNames.Length != 4 || payoutMultipliers == null || payoutMultipliers.Length != 4) //checks whether the names and payout values match the four symbols
+        {
+            Debug.LogError("You need four symbol names and four payout multipliers."); //shows an error if the payout setup is incomplete
+            return false; //stops the game setup
+        }
+
+        for (int i = 0; i < symbols.Length; i++) //checks every symbol
+        {
+            if (symbols[i] == null || string.IsNullOrWhiteSpace(symbolNames[i]) || payoutMultipliers[i] < 0) //checks whether the symbol, name or payout is invalid
+            {
+                Debug.LogError("Check the symbol, symbol name and payout settings at index " + i); //shows which symbol needs to be fixed
+                return false; //stops the game setup
+            }
+        }
+
+        if (reels == null || reels.Length != 3) //checks whether exactly three reels have been assigned
+        {
+            Debug.LogError("Assign exactly three reels to the Game Manager."); //shows an error if the reel array is incorrect
+            return false; //stops the game setup
+        }
+
+        for (int i = 0; i < reels.Length; i++) //checks each reel reference
+        {
+            if (reels[i] == null) //checks whether a reel has not been assigned
+            {
+                Debug.LogError("One or more reels are missing from the Game Manager."); //shows an error if a reel reference is empty
+                return false; //stops the game setup
+            }
+
+            for (int j = i + 1; j < reels.Length; j++) //checks the remaining reel references for duplicates
+            {
+                if (reels[i] == reels[j]) //checks whether the same reel has been assigned more than once
+                {
+                    Debug.LogError("Each reel must be a separate object."); //shows an error if a reel has been assigned multiple times
+                    return false; //stops the game setup
+                }
+            }
+        }
+
+        if (balanceText == null || betText == null || resultText == null) //checks whether all three text references have been assigned
+        {
+            Debug.LogError("Assign all three text objects to the Game Manager."); //shows an error if a text reference is missing
+            return false; //stops the game setup
+        }
+
+        if (spinButton == null || increaseBetButton == null || decreaseBetButton == null) //checks whether all three button references have been assigned
+        {
+            Debug.LogError("Assign all three buttons to the Game Manager."); //shows an error if a button reference is missing
+            return false; //stops the game setup
+        }
+
+        return true; //tells Start that the setup is valid
+    }
+
+    public Sprite GetSymbol(int symbolIndex)
+    {
+        return symbols[symbolIndex]; //returns the sprite at the requested symbol index
+    }
+
+    void Spin()
+    {
+        if (isGameRunning || balance < currentBet) //checks whether the game is already running or the player cannot afford the bet
+            return; //stops the spin if either condition is true
+
+        StartCoroutine(SpinRoutine()); //starts the complete slot machine spin
+    }
+
+    IEnumerator SpinRoutine()
+    {
+        isGameRunning = true; //prevents the player from starting another spin
+
+        balance -= currentBet; //deducts the selected bet from the player's balance
+
+        UpdateUI(); //updates the balance and disables the buttons while the reels are spinning
+
+        resultText.text = "Spinning..."; //displays a message while the reels are moving
+
+        int[] results = new int[reels.Length]; //creates an array to store the final result of each reel
+
+        for (int i = 0; i < reels.Length; i++) //goes through each reel
+        {
+            results[i] = Random.Range(0, symbols.Length); //selects a random symbol index for this reel
+
+            reels[i].SpinTo(results[i], i * 0.4f); //starts this reel and adds a small delay so the reels stop one after another
+        }
+
+        while (AreReelsSpinning()) //keeps waiting while at least one reel is still moving
+        {
+            yield return null; //waits for the next frame before checking again
+        }
+
+        CheckResult(results); //checks whether the player has won or lost
+
+        isGameRunning = false; //allows the player to start another spin
+
+        UpdateUI(); //updates the balance, bet and buttons after the spin has finished
+    }
+
+    bool AreReelsSpinning()
+    {
+        for (int i = 0; i < reels.Length; i++) //checks each reel one by one
+        {
+            if (reels[i].IsSpinning) //checks whether this reel is still moving
+                return true; //tells the Game Manager that the spin is not finished yet
+        }
+
+        return false; //tells the Game Manager that all reels have stopped
+    }
+
+    void CheckResult(int[] results)
+    {
+        bool isWin = results[0] == results[1] && results[1] == results[2]; //checks whether all three reels landed on the same symbol
+
+        if (isWin) //runs this section when all three symbols match
+        {
+            int winningSymbol = results[0]; //gets the index of the matching symbol
+
+            int winnings = currentBet * payoutMultipliers[winningSymbol]; //calculates the total payout using the matching symbol's multiplier
+
+            balance += winnings; //adds the winnings to the player's balance
+
+            resultText.text = "JACKPOT! " + symbolNames[winningSymbol] + " x3! You won " + winnings + " coins!"; //displays the winning symbol and payout
+        }
+        else //runs this section when the three symbols do not match
+        {
+            resultText.text = "No win this time! Try again."; //displays the losing message
+        }
+    }
+
+    void IncreaseBet()
+    {
+        if (isGameRunning) //checks whether the reels are currently spinning
+            return; //stops the bet from changing during a spin
+
+        if (currentBet + betStep <= maximumBet && currentBet + betStep <= balance) //checks whether the next bet is within the maximum and affordable
+        {
+            currentBet += betStep; //increases the current bet
+
+            UpdateUI(); //updates the bet text and button states
+        }
+    }
+
+    void DecreaseBet()
+    {
+        if (isGameRunning) //checks whether the reels are currently spinning
+            return; //stops the bet from changing during a spin
+
+        if (currentBet - betStep >= minimumBet) //checks whether the next bet stays above the minimum
+        {
+            currentBet -= betStep; //decreases the current bet
+
+            UpdateUI(); //updates the bet text and button states
+        }
+    }
+
+    void UpdateUI()
+    {
+        balanceText.text = "Balance: " + balance; //updates the balance text whenever the player wins or loses coins
+
+        betText.text = "Bet: " + currentBet; //updates the bet amount displayed on the screen
+
+        spinButton.interactable = !isGameRunning && balance >= currentBet; //disables Spin while the reels are moving or the player cannot afford the bet
+
+        increaseBetButton.interactable = !isGameRunning && currentBet + betStep <= maximumBet && currentBet + betStep <= balance; //disables Increase Bet when the next bet is too high or unaffordable
+
+        decreaseBetButton.interactable = !isGameRunning && currentBet - betStep >= minimumBet; //disables Decrease Bet when the player has already reached the minimum bet
+    }
+
+    void OnDestroy()
+    {
+        if (spinButton != null) //checks whether the Spin button still exists
+            spinButton.onClick.RemoveListener(Spin); //removes the Spin listener when this object is destroyed
+
+        if (increaseBetButton != null) //checks whether the Increase Bet button still exists
+            increaseBetButton.onClick.RemoveListener(IncreaseBet); //removes the Increase Bet listener when this object is destroyed
+
+        if (decreaseBetButton != null) //checks whether the Decrease Bet button still exists
+            decreaseBetButton.onClick.RemoveListener(DecreaseBet); //removes the Decrease Bet listener when this object is destroyed
+    }
+}
