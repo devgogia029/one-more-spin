@@ -5,12 +5,13 @@ using UnityEngine.UI;
 public class SlotReel : MonoBehaviour
 {
     public float spinDuration = 2.5f; //how long the reel takes to finish spinning
-    public float symbolHeight = 140f; //height of each symbol; matching the size of the reel window
+    public float symbolHeight = 100f; //height of each symbol; matches the 100 x 100 symbol art
     public int totalSymbols = 30; //number of symbols in the scrolling strip
 
     private RectTransform symbolStrip; //reference to the vertical strip that holds all the symbols
     private Image[] symbolImages; //stores all the symbol Images so they can be changed without searching again
     private Sprite[] reelSymbols; //stores the four symbols assigned to this reel
+    private float windowHeight; //height of the visible reel window, used to centre symbols inside it
     private bool isSpinning; //true when the reel is spinning; false when stopped
     private bool isReady; //true when symbol strip has been created successfully
 
@@ -50,7 +51,7 @@ public class SlotReel : MonoBehaviour
             }
         }
 
-        if (symbolHeight <= 0f || totalSymbols < 2 || spinDuration <= 0f) //checks whether the reel settings are valid
+        if (symbolHeight <= 0f || totalSymbols < 6 || spinDuration <= 0f) //checks whether the reel settings are valid; six symbols are needed so the copied and target symbols never overlap
         {
             Debug.LogError("Check the reel settings on " + gameObject.name); //shows which reel has incorrect settings
             return; //stops the method because the reel cannot work correctly
@@ -63,8 +64,15 @@ public class SlotReel : MonoBehaviour
         isReady = true; //tells the Game Manager that this reel is ready to use
     }
 
+    float GetCenteredPosition(int symbolIndex)
+    {
+        return symbolIndex * symbolHeight - (windowHeight - symbolHeight) / 2f; //works out where the strip must sit so this symbol is centred in the window with half a symbol visible above and below
+    }
+
     void CreateSymbolStrip(Sprite[] symbols)
     {
+        windowHeight = GetComponent<RectTransform>().rect.height; //stores the height of the reel window so symbols can be centred inside it
+
         GameObject stripObject = new GameObject("SymbolStrip", typeof(RectTransform)); //creates an empty object with a Rect Transform to hold all the symbol images
 
         stripObject.transform.SetParent(transform, false); //makes the strip a child of this reel without changing its local transform
@@ -101,6 +109,8 @@ public class SlotReel : MonoBehaviour
 
             symbolImages[i] = symbolImage; //stores the Image reference so it can be updated later
         }
+
+        symbolStrip.anchoredPosition = new Vector2(0f, GetCenteredPosition(totalSymbols - 2)); //moves the strip so the reel starts on the same position every spin ends on, with three symbols visible
     }
 
     public void SpinTo(int targetSymbolIndex, float startDelay)
@@ -118,20 +128,29 @@ public class SlotReel : MonoBehaviour
     {
         isSpinning = true; //marks this reel as spinning before the animation begins
 
-        for (int i = 0; i < symbolImages.Length - 1; i++) //goes through every symbol except the final one
+        Sprite spriteAbove = symbolImages[totalSymbols - 3].sprite; //remembers the symbol currently showing in the top row
+        Sprite spriteMiddle = symbolImages[totalSymbols - 2].sprite; //remembers the symbol currently showing in the middle row
+        Sprite spriteBelow = symbolImages[totalSymbols - 1].sprite; //remembers the symbol currently showing in the bottom row
+
+        symbolImages[0].sprite = spriteAbove; //copies the top row symbol to the start of the strip so the new spin begins exactly where the last one stopped
+        symbolImages[1].sprite = spriteMiddle; //copies the middle row symbol to the start of the strip
+        symbolImages[2].sprite = spriteBelow; //copies the bottom row symbol to the start of the strip
+
+        for (int i = 3; i < symbolImages.Length; i++) //goes through every symbol after the three copied ones
         {
             symbolImages[i].sprite = reelSymbols[Random.Range(0, reelSymbols.Length)]; //gives each position a random symbol for this spin
         }
 
-        symbolImages[symbolImages.Length - 1].sprite = reelSymbols[targetSymbolIndex]; //sets the final position to the result selected by the Game Manager
+        symbolImages[totalSymbols - 2].sprite = reelSymbols[targetSymbolIndex]; //sets the second to last position to the result selected by the Game Manager so it lands in the middle row
 
-        symbolStrip.anchoredPosition = Vector2.zero; //resets the strip to the top before starting the new spin
+        float startPosition = GetCenteredPosition(1); //works out the strip position that shows the copied symbols in the window
+        float finalPosition = GetCenteredPosition(totalSymbols - 2); //works out the strip position that centres the result symbol in the window
+
+        symbolStrip.anchoredPosition = new Vector2(0f, startPosition); //resets the strip to the start position; the screen looks identical because the symbols were copied
 
         yield return new WaitForSeconds(Mathf.Max(0f, startDelay)); //waits before starting so the reels can stop one after another
 
         float elapsedTime = 0f; //tracks how much time has passed during the animation
-
-        float finalPosition = (totalSymbols - 1) * symbolHeight; //calculates how far the strip must move to show the final symbol
 
         while (elapsedTime < spinDuration) //keeps animating until the spin duration has passed
         {
@@ -139,9 +158,9 @@ public class SlotReel : MonoBehaviour
 
             float progress = Mathf.Clamp01(elapsedTime / spinDuration); //calculates the animation progress from zero to one
 
-            float easedProgress = Mathf.SmoothStep(0f, 1f, progress); //slows the reel smoothly as it approaches its final position
+            float easedProgress = 1f - Mathf.Pow(1f - progress, 3f); //starts at full speed and slows down smoothly as it approaches its final position, like a real reel braking
 
-            float currentPosition = Mathf.Lerp(0f, finalPosition, easedProgress); //calculates the strip's current position
+            float currentPosition = Mathf.Lerp(startPosition, finalPosition, easedProgress); //calculates the strip's current position
 
             symbolStrip.anchoredPosition = new Vector2(0f, currentPosition); //moves the strip to the calculated position
 
