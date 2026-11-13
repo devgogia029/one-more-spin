@@ -41,6 +41,10 @@ public class SlotMachineManager : MonoBehaviour
     public GameObject gameOverPopup; //reference to the popup shown when the player runs out of coins
     public Button playAgainButton; //reference to the Yes button on the popup that restarts the game
 
+    [Header("Audio")]
+
+    public AudioManager audioManager; //reference to the object that plays the sound effects and the background music
+
     private int balance; //stores the player's current balance
     private int currentBet; //stores the amount the player has selected to bet
     private bool isGameRunning; //true while the reels are spinning; false when the game is ready for another spin
@@ -71,6 +75,8 @@ public class SlotMachineManager : MonoBehaviour
         playAgainButton.onClick.AddListener(RestartGame); //calls RestartGame whenever the player clicks Yes on the game over popup
 
         gameOverPopup.SetActive(false); //hides the game over popup when the game starts
+
+        audioManager.PlayMusic(); //starts the looping background music
 
         resultText.text = "Place your bet and spin!"; //displays the starting message
 
@@ -160,6 +166,12 @@ public class SlotMachineManager : MonoBehaviour
             return false; //stops the game setup
         }
 
+        if (audioManager == null) //checks whether the Audio Manager has been assigned
+        {
+            Debug.LogError("Assign the Audio Manager to the Game Manager."); //shows an error if the Audio Manager is missing
+            return false; //stops the game setup
+        }
+
         return true; //tells Start that the setup is valid
     }
 
@@ -174,22 +186,19 @@ public class SlotMachineManager : MonoBehaviour
             return; //stops the spin if either condition is true
 
         leverAnimator.SetTrigger("Pull"); //plays the lever pull animation
-
+        audioManager.PlayLever(); //plays the lever sound
+        audioManager.PlayMusic(); //makes sure the music is playing, because browsers only allow sound after the player has clicked something
         StartCoroutine(SpinRoutine()); //starts the complete slot machine spin
     }
 
     IEnumerator SpinRoutine()
     {
         isGameRunning = true; //prevents the player from starting another spin
-
         balance -= currentBet; //deducts the selected bet from the player's balance
-
         UpdateUI(); //updates the balance and disables the buttons while the reels are spinning
-
         resultText.text = "Spinning..."; //displays a message while the reels are moving
-
         int[] results = new int[reels.Length]; //creates an array to store the final result of each reel
-
+        bool[] hasStopped = new bool[reels.Length]; //remembers which reels have already played their stop sound
         for (int i = 0; i < reels.Length; i++) //goes through each reel
         {
             results[i] = Random.Range(0, symbols.Length); //selects a random symbol index for this reel
@@ -199,9 +208,11 @@ public class SlotMachineManager : MonoBehaviour
 
         while (AreReelsSpinning()) //keeps waiting while at least one reel is still moving
         {
+            PlayReelStopSounds(hasStopped); //plays a stop sound for any reel that has just finished
             yield return null; //waits for the next frame before checking again
         }
 
+        PlayReelStopSounds(hasStopped); //catches the last reel, which stops at the moment the loop ends
         CheckResult(results); //checks whether the player has won or lost
 
         while (currentBet > balance && currentBet - betStep >= minimumBet) //keeps lowering the bet while the player cannot afford it and a lower bet is still allowed
@@ -217,7 +228,6 @@ public class SlotMachineManager : MonoBehaviour
         }
 
         isGameRunning = false; //allows the player to start another spin
-
         UpdateUI(); //updates the balance, bet and buttons after the spin has finished
     }
 
@@ -232,43 +242,50 @@ public class SlotMachineManager : MonoBehaviour
         return false; //tells the Game Manager that all reels have stopped
     }
 
+    void PlayReelStopSounds(bool[] hasStopped)
+    {
+        for (int i = 0; i < reels.Length; i++) //checks each reel one by one
+        {
+            if (!hasStopped[i] && reels[i].HasLanded) //checks whether this reel has visually landed and has not played its sound yet
+            {
+                hasStopped[i] = true; //remembers that this reel has played its stop sound so it never plays twice
+
+                audioManager.PlayReelStop(); //plays the reel stop sound
+            }
+        }
+    }
+
     void CheckResult(int[] results)
     {
         bool isWin = results[0] == results[1] && results[1] == results[2]; //checks whether all three reels landed on the same symbol
-
         if (isWin) //runs this section when all three symbols match
         {
             int winningSymbol = results[0]; //gets the index of the matching symbol
-
             int winnings = currentBet * payoutMultipliers[winningSymbol]; //calculates the total payout using the matching symbol's multiplier
-
             balance += winnings; //adds the winnings to the player's balance
-
-            resultText.text = "JACKPOT! " + symbolNames[winningSymbol] + " x3! +" + winnings + " coins!"; //displays the winning symbol and payout
+            resultText.text = "JACKPOT! " + symbolNames[winningSymbol] + " x3! +" + winnings + " coins"; //displays the winning symbol and payout in a short message that fits the result box
+            audioManager.PlayWin(); //plays the win sound
         }
         else //runs this section when the three symbols do not match
         {
             resultText.text = "No win this time! Try again."; //displays the losing message
+            audioManager.PlayLose(); //plays the lose sound
         }
     }
 
     void ShowGameOver()
     {
         resultText.text = "You ran out of coins!"; //tells the player why the game has stopped
-
         gameOverPopup.SetActive(true); //shows the game over popup
+        audioManager.PlayGameOver(); //plays the game over sound
     }
 
     void RestartGame()
     {
         balance = startingBalance; //gives the player the starting balance again
-
         currentBet = minimumBet; //puts the bet back to the minimum
-
         gameOverPopup.SetActive(false); //hides the game over popup
-
         resultText.text = "Place your bet and spin!"; //displays the starting message again
-
         UpdateUI(); //updates the balance, bet and button states for the new game
     }
 
@@ -280,7 +297,6 @@ public class SlotMachineManager : MonoBehaviour
         if (currentBet + betStep <= maximumBet && currentBet + betStep <= balance) //checks whether the next bet is within the maximum and affordable
         {
             currentBet += betStep; //increases the current bet
-
             UpdateUI(); //updates the bet text and button states
         }
     }
@@ -293,7 +309,6 @@ public class SlotMachineManager : MonoBehaviour
         if (currentBet - betStep >= minimumBet) //checks whether the next bet stays above the minimum
         {
             currentBet -= betStep; //decreases the current bet
-
             UpdateUI(); //updates the bet text and button states
         }
     }
@@ -301,13 +316,9 @@ public class SlotMachineManager : MonoBehaviour
     void UpdateUI()
     {
         balanceText.text = "Balance: " + balance; //updates the balance text whenever the player wins or loses coins
-
         betText.text = "Bet: " + currentBet; //updates the bet amount displayed on the screen
-
         spinButton.interactable = !isGameRunning && balance >= currentBet; //disables the lever while the reels are moving or the player cannot afford the bet
-
         increaseBetButton.interactable = !isGameRunning && currentBet + betStep <= maximumBet && currentBet + betStep <= balance; //disables Increase Bet when the next bet is too high or unaffordable
-
         decreaseBetButton.interactable = !isGameRunning && currentBet - betStep >= minimumBet; //disables Decrease Bet when the player has already reached the minimum bet
     }
 

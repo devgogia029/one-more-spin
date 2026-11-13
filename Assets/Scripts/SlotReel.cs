@@ -7,6 +7,8 @@ public class SlotReel : MonoBehaviour
     public float spinDuration = 2.5f; //how long the reel takes to finish spinning
     public float symbolHeight = 100f; //height of each symbol; matches the 100 x 100 symbol art
     public int totalSymbols = 30; //number of symbols in the scrolling strip
+    public float brakingPower = 2f; //how sharply the reel slows down; a lower number starts slower and stops sooner
+    public float landingDistance = 10f; //how close in pixels the strip must be to its final position before the reel counts as landed
 
     private RectTransform symbolStrip; //reference to the vertical strip that holds all the symbols
     private Image[] symbolImages; //stores all the symbol Images so they can be changed without searching again
@@ -14,8 +16,10 @@ public class SlotReel : MonoBehaviour
     private float windowHeight; //height of the visible reel window, used to centre symbols inside it
     private bool isSpinning; //true when the reel is spinning; false when stopped
     private bool isReady; //true when symbol strip has been created successfully
+    private bool hasLanded; //true once the reel has visually arrived at its final position
 
     public bool IsSpinning => isSpinning; //lets the manager check whether this reel is still spinning
+    public bool HasLanded => hasLanded; //lets the Game Manager play the stop sound at the moment the reel visually lands
     public bool IsReady => isReady; //lets the Game Manager check if the reel has been set up correctly
 
     void Awake()
@@ -51,7 +55,7 @@ public class SlotReel : MonoBehaviour
             }
         }
 
-        if (symbolHeight <= 0f || totalSymbols < 6 || spinDuration <= 0f) //checks whether the reel settings are valid; six symbols are needed so the copied and target symbols never overlap
+        if (symbolHeight <= 0f || totalSymbols < 6 || spinDuration <= 0f || brakingPower <= 0f) //checks whether the reel settings are valid; six symbols are needed so the copied and target symbols never overlap
         {
             Debug.LogError("Check the reel settings on " + gameObject.name); //shows which reel has incorrect settings
             return; //stops the method because the reel cannot work correctly
@@ -127,6 +131,7 @@ public class SlotReel : MonoBehaviour
     IEnumerator SpinRoutine(int targetSymbolIndex, float startDelay)
     {
         isSpinning = true; //marks this reel as spinning before the animation begins
+        hasLanded = false; //marks the reel as not landed yet for this spin
 
         Sprite spriteAbove = symbolImages[totalSymbols - 3].sprite; //remembers the symbol currently showing in the top row
         Sprite spriteMiddle = symbolImages[totalSymbols - 2].sprite; //remembers the symbol currently showing in the middle row
@@ -145,30 +150,24 @@ public class SlotReel : MonoBehaviour
 
         float startPosition = GetCenteredPosition(1); //works out the strip position that shows the copied symbols in the window
         float finalPosition = GetCenteredPosition(totalSymbols - 2); //works out the strip position that centres the result symbol in the window
-
         symbolStrip.anchoredPosition = new Vector2(0f, startPosition); //resets the strip to the start position; the screen looks identical because the symbols were copied
-
         yield return new WaitForSeconds(Mathf.Max(0f, startDelay)); //waits before starting so the reels can stop one after another
-
         float elapsedTime = 0f; //tracks how much time has passed during the animation
-
         while (elapsedTime < spinDuration) //keeps animating until the spin duration has passed
         {
             elapsedTime += Time.deltaTime; //adds the time passed since the previous frame
 
             float progress = Mathf.Clamp01(elapsedTime / spinDuration); //calculates the animation progress from zero to one
-
-            float easedProgress = 1f - Mathf.Pow(1f - progress, 3f); //starts at full speed and slows down smoothly as it approaches its final position, like a real reel braking
-
+            float easedProgress = 1f - Mathf.Pow(1f - progress, brakingPower); //starts at full speed and slows down smoothly, using the braking power to control how sharply
             float currentPosition = Mathf.Lerp(startPosition, finalPosition, easedProgress); //calculates the strip's current position
-
             symbolStrip.anchoredPosition = new Vector2(0f, currentPosition); //moves the strip to the calculated position
-
+            if (!hasLanded && Mathf.Abs(finalPosition - currentPosition) <= landingDistance) //checks whether the strip is close enough to its final position to look landed
+                hasLanded = true; //marks the reel as landed so the stop sound can play at the right moment
             yield return null; //waits for the next frame before continuing the animation
         }
 
         symbolStrip.anchoredPosition = new Vector2(0f, finalPosition); //makes sure the strip ends at the exact final position
-
+        hasLanded = true; //makes sure the reel always counts as landed once it has finished
         isSpinning = false; //tells the Game Manager that this reel has stopped
     }
 }
