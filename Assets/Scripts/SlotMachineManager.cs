@@ -244,7 +244,7 @@ public class SlotMachineManager : MonoBehaviour
 
             balance += winnings; //adds the winnings to the player's balance
 
-            resultText.text = "JACKPOT! " + symbolNames[winningSymbol] + " x3! You won " + winnings + " coins!"; //displays the winning symbol and payout
+            resultText.text = "JACKPOT! " + symbolNames[winningSymbol] + " x3! +" + winnings + " coins!"; //displays the winning symbol and payout
         }
         else //runs this section when the three symbols do not match
         {
