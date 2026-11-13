@@ -16,7 +16,7 @@ public class SlotMachineManager : MonoBehaviour
 
     public Sprite[] symbols; //stores the four slot symbols in the correct order: 7, Cherries, Bell, BAR
     public string[] symbolNames = { "7", "Cherries", "Bell", "BAR" }; //stores the names used when displaying the winning result
-    public int[] payoutMultipliers = { 10, 5, 3, 2 }; //stores the payout multiplier for each symbol in the same order
+    public int[] payoutMultipliers = { 30, 15, 10, 5 }; //stores the payout multiplier for each symbol in the same order; these give a return of about 94% over many spins
 
     [Header("Reels")]
 
@@ -28,9 +28,18 @@ public class SlotMachineManager : MonoBehaviour
     public TMP_Text betText; //reference to the text that displays the current bet
     public TMP_Text resultText; //reference to the text that displays wins and losses
 
-    public Button spinButton; //reference to the Spin button
+    public Button spinButton; //reference to the invisible button placed over the lever; clicking the lever starts a spin
     public Button increaseBetButton; //reference to the button that increases the bet
     public Button decreaseBetButton; //reference to the button that decreases the bet
+
+    [Header("Lever")]
+
+    public Animator leverAnimator; //reference to the Animator on the lever image; plays the pull animation
+
+    [Header("Game Over")]
+
+    public GameObject gameOverPopup; //reference to the popup shown when the player runs out of coins
+    public Button playAgainButton; //reference to the Yes button on the popup that restarts the game
 
     private int balance; //stores the player's current balance
     private int currentBet; //stores the amount the player has selected to bet
@@ -53,11 +62,15 @@ public class SlotMachineManager : MonoBehaviour
             reels[i].Initialize(symbols); //gives each reel the four symbols and creates its scrolling strip
         }
 
-        spinButton.onClick.AddListener(Spin); //calls Spin whenever the player clicks the Spin button
+        spinButton.onClick.AddListener(Spin); //calls Spin whenever the player clicks the lever
 
         increaseBetButton.onClick.AddListener(IncreaseBet); //calls IncreaseBet whenever the player clicks the increase button
 
         decreaseBetButton.onClick.AddListener(DecreaseBet); //calls DecreaseBet whenever the player clicks the decrease button
+
+        playAgainButton.onClick.AddListener(RestartGame); //calls RestartGame whenever the player clicks Yes on the game over popup
+
+        gameOverPopup.SetActive(false); //hides the game over popup when the game starts
 
         resultText.text = "Place your bet and spin!"; //displays the starting message
 
@@ -135,6 +148,18 @@ public class SlotMachineManager : MonoBehaviour
             return false; //stops the game setup
         }
 
+        if (leverAnimator == null) //checks whether the lever Animator has been assigned
+        {
+            Debug.LogError("Assign the lever Animator to the Game Manager."); //shows an error if the lever Animator is missing
+            return false; //stops the game setup
+        }
+
+        if (gameOverPopup == null || playAgainButton == null) //checks whether the game over popup and its Yes button have been assigned
+        {
+            Debug.LogError("Assign the game over popup and the play again button to the Game Manager."); //shows an error if the popup references are missing
+            return false; //stops the game setup
+        }
+
         return true; //tells Start that the setup is valid
     }
 
@@ -147,6 +172,8 @@ public class SlotMachineManager : MonoBehaviour
     {
         if (isGameRunning || balance < currentBet) //checks whether the game is already running or the player cannot afford the bet
             return; //stops the spin if either condition is true
+
+        leverAnimator.SetTrigger("Pull"); //plays the lever pull animation
 
         StartCoroutine(SpinRoutine()); //starts the complete slot machine spin
     }
@@ -176,6 +203,18 @@ public class SlotMachineManager : MonoBehaviour
         }
 
         CheckResult(results); //checks whether the player has won or lost
+
+        while (currentBet > balance && currentBet - betStep >= minimumBet) //keeps lowering the bet while the player cannot afford it and a lower bet is still allowed
+        {
+            currentBet -= betStep; //lowers the bet by one step so the player is never stuck with a bet they cannot afford
+        }
+
+        if (balance < minimumBet) //checks whether the player can no longer afford even the smallest bet
+        {
+            yield return new WaitForSeconds(1.5f); //pauses briefly so the player can read the final result first
+
+            ShowGameOver(); //shows the game over popup
+        }
 
         isGameRunning = false; //allows the player to start another spin
 
@@ -213,6 +252,26 @@ public class SlotMachineManager : MonoBehaviour
         }
     }
 
+    void ShowGameOver()
+    {
+        resultText.text = "You ran out of coins!"; //tells the player why the game has stopped
+
+        gameOverPopup.SetActive(true); //shows the game over popup
+    }
+
+    void RestartGame()
+    {
+        balance = startingBalance; //gives the player the starting balance again
+
+        currentBet = minimumBet; //puts the bet back to the minimum
+
+        gameOverPopup.SetActive(false); //hides the game over popup
+
+        resultText.text = "Place your bet and spin!"; //displays the starting message again
+
+        UpdateUI(); //updates the balance, bet and button states for the new game
+    }
+
     void IncreaseBet()
     {
         if (isGameRunning) //checks whether the reels are currently spinning
@@ -245,7 +304,7 @@ public class SlotMachineManager : MonoBehaviour
 
         betText.text = "Bet: " + currentBet; //updates the bet amount displayed on the screen
 
-        spinButton.interactable = !isGameRunning && balance >= currentBet; //disables Spin while the reels are moving or the player cannot afford the bet
+        spinButton.interactable = !isGameRunning && balance >= currentBet; //disables the lever while the reels are moving or the player cannot afford the bet
 
         increaseBetButton.interactable = !isGameRunning && currentBet + betStep <= maximumBet && currentBet + betStep <= balance; //disables Increase Bet when the next bet is too high or unaffordable
 
@@ -254,7 +313,7 @@ public class SlotMachineManager : MonoBehaviour
 
     void OnDestroy()
     {
-        if (spinButton != null) //checks whether the Spin button still exists
+        if (spinButton != null) //checks whether the lever button still exists
             spinButton.onClick.RemoveListener(Spin); //removes the Spin listener when this object is destroyed
 
         if (increaseBetButton != null) //checks whether the Increase Bet button still exists
@@ -262,5 +321,8 @@ public class SlotMachineManager : MonoBehaviour
 
         if (decreaseBetButton != null) //checks whether the Decrease Bet button still exists
             decreaseBetButton.onClick.RemoveListener(DecreaseBet); //removes the Decrease Bet listener when this object is destroyed
+
+        if (playAgainButton != null) //checks whether the Play Again button still exists
+            playAgainButton.onClick.RemoveListener(RestartGame); //removes the Restart listener when this object is destroyed
     }
 }
