@@ -6,7 +6,7 @@ A three-reel slot machine built in Unity for the slot game assignment. Choose a 
 - itch.io: https://devgogia.itch.io/one-more-spin
 - GitHub Pages: https://devgogia029.github.io/one-more-spin/Build/WebGL/
 
-**Gameplay clip:** [Docs/gameplay.mp4](Docs/gameplay.mp4), a 30-second recording in case the game is slow to load in Github Pages.
+**Gameplay clip:** [Watch the 30-second clip](https://github.com/devgogia029/one-more-spin/raw/refs/heads/main/Docs/gameplay.mp4). GitHub can't preview large videos, so this link opens the file directly.
 
 The build is about 15 MB, so the first load can take some time on a slow connection. After that, the browser keeps a copy, so reloads are quick. Sound starts after your first click, because browsers block audio until then.
 
