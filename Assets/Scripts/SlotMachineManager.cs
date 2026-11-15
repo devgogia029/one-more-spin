@@ -45,9 +45,19 @@ public class SlotMachineManager : MonoBehaviour
 
     public AudioManager audioManager; //reference to the object that plays the sound effects and the background music
 
+    [Header("Auto Spin")]
+
+    public Button autoSpinButton; //reference to the button that starts and stops auto spin
+    public TMP_Text autoSpinText; //reference to the text on the auto spin button; shows AUTO, the spins left, or STOPPING
+    public int autoSpinCount = 10; //number of spins played automatically each time auto spin is started
+    public float autoSpinDelay = 1.2f; //pause in seconds between automatic spins so the player can read each result
+
     private int balance; //stores the player's current balance
     private int currentBet; //stores the amount the player has selected to bet
     private bool isGameRunning; //true while the reels are spinning; false when the game is ready for another spin
+    private int autoSpinsLeft; //stores how many automatic spins are still to be played
+    private bool isAutoSpinning; //true while auto spin is running
+    private bool stopAutoSpin; //true when the player has pressed stop and auto spin should end after the current spin
 
     void Start()
     {
@@ -58,28 +68,20 @@ public class SlotMachineManager : MonoBehaviour
         }
 
         balance = startingBalance; //sets the player's balance to the starting amount
-
         currentBet = minimumBet; //starts the player at the minimum bet
-
         for (int i = 0; i < reels.Length; i++) //goes through all three reels
         {
             reels[i].Initialize(symbols); //gives each reel the four symbols and creates its scrolling strip
         }
 
         spinButton.onClick.AddListener(Spin); //calls Spin whenever the player clicks the lever
-
         increaseBetButton.onClick.AddListener(IncreaseBet); //calls IncreaseBet whenever the player clicks the increase button
-
         decreaseBetButton.onClick.AddListener(DecreaseBet); //calls DecreaseBet whenever the player clicks the decrease button
-
+        autoSpinButton.onClick.AddListener(ToggleAutoSpin); //calls ToggleAutoSpin whenever the player clicks the auto spin button
         playAgainButton.onClick.AddListener(RestartGame); //calls RestartGame whenever the player clicks Yes on the game over popup
-
         gameOverPopup.SetActive(false); //hides the game over popup when the game starts
-
         audioManager.PlayMusic(); //starts the looping background music
-
         resultText.text = "Place your bet and spin!"; //displays the starting message
-
         UpdateUI(); //updates the balance, bet and button states when the game starts
     }
 
@@ -172,6 +174,18 @@ public class SlotMachineManager : MonoBehaviour
             return false; //stops the game setup
         }
 
+        if (autoSpinButton == null || autoSpinText == null) //checks whether the auto spin button and its text have been assigned
+        {
+            Debug.LogError("Assign the auto spin button and its text to the Game Manager."); //shows an error if an auto spin reference is missing
+            return false; //stops the game setup
+        }
+
+        if (autoSpinCount <= 0 || autoSpinDelay < 0f) //checks whether the auto spin settings make sense
+        {
+            Debug.LogError("Check your auto spin count and auto spin delay settings."); //shows an error if the auto spin settings are incorrect
+            return false; //stops the game setup
+        }
+
         return true; //tells Start that the setup is valid
     }
 
@@ -182,13 +196,54 @@ public class SlotMachineManager : MonoBehaviour
 
     void Spin()
     {
-        if (isGameRunning || balance < currentBet) //checks whether the game is already running or the player cannot afford the bet
-            return; //stops the spin if either condition is true
+        if (isGameRunning || isAutoSpinning || balance < currentBet) //checks whether a spin or auto spin is running, or the player cannot afford the bet
+            return; //stops the spin if any condition is true
 
+        PullLever(); //plays the lever animation and sounds
+        StartCoroutine(SpinRoutine()); //starts the complete slot machine spin
+    }
+
+    void PullLever()
+    {
         leverAnimator.SetTrigger("Pull"); //plays the lever pull animation
         audioManager.PlayLever(); //plays the lever sound
         audioManager.PlayMusic(); //makes sure the music is playing, because browsers only allow sound after the player has clicked something
-        StartCoroutine(SpinRoutine()); //starts the complete slot machine spin
+    }
+
+    void ToggleAutoSpin()
+    {
+        if (isAutoSpinning) //checks whether auto spin is already running
+        {
+            stopAutoSpin = true; //asks auto spin to stop once the current spin has finished
+            UpdateUI(); //updates the button so it shows that auto spin is stopping
+            return; //stops the method so auto spin is never started twice
+        }
+
+        if (isGameRunning || balance < currentBet) //checks whether a spin is in progress or the player cannot afford the bet
+            return; //stops auto spin from starting
+
+        StartCoroutine(AutoSpinRoutine()); //starts the automatic spins
+    }
+
+    IEnumerator AutoSpinRoutine()
+    {
+        isAutoSpinning = true; //marks auto spin as running so the lever and bet buttons stay locked
+        stopAutoSpin = false; //clears any earlier stop request
+        autoSpinsLeft = autoSpinCount; //sets how many automatic spins will be played
+        UpdateUI(); //shows the number of spins left on the button straight away
+        while (autoSpinsLeft > 0 && !stopAutoSpin && balance >= currentBet) //keeps spinning while spins are left, the player has not pressed stop and the bet is affordable
+        {
+            PullLever(); //plays the lever animation and sound for this spin
+            yield return StartCoroutine(SpinRoutine()); //plays one full spin and waits until it has completely finished, including the result
+            autoSpinsLeft--; //counts this spin as finished
+            UpdateUI(); //updates the number of spins left on the button
+            if (autoSpinsLeft > 0 && !stopAutoSpin) //checks whether another spin is about to start
+                yield return new WaitForSeconds(autoSpinDelay); //pauses so the player can read the result before the next spin
+        }
+
+        isAutoSpinning = false; //marks auto spin as finished so the lever and bet buttons unlock
+        stopAutoSpin = false; //clears the stop request
+        UpdateUI(); //updates the buttons and text now that auto spin has ended
     }
 
     IEnumerator SpinRoutine()
@@ -202,7 +257,6 @@ public class SlotMachineManager : MonoBehaviour
         for (int i = 0; i < reels.Length; i++) //goes through each reel
         {
             results[i] = Random.Range(0, symbols.Length); //selects a random symbol index for this reel
-
             reels[i].SpinTo(results[i], i * 0.4f); //starts this reel and adds a small delay so the reels stop one after another
         }
 
@@ -223,7 +277,6 @@ public class SlotMachineManager : MonoBehaviour
         if (balance < minimumBet) //checks whether the player can no longer afford even the smallest bet
         {
             yield return new WaitForSeconds(1.5f); //pauses briefly so the player can read the final result first
-
             ShowGameOver(); //shows the game over popup
         }
 
@@ -249,7 +302,6 @@ public class SlotMachineManager : MonoBehaviour
             if (!hasStopped[i] && reels[i].HasLanded) //checks whether this reel has visually landed and has not played its sound yet
             {
                 hasStopped[i] = true; //remembers that this reel has played its stop sound so it never plays twice
-
                 audioManager.PlayReelStop(); //plays the reel stop sound
             }
         }
@@ -291,7 +343,7 @@ public class SlotMachineManager : MonoBehaviour
 
     void IncreaseBet()
     {
-        if (isGameRunning) //checks whether the reels are currently spinning
+        if (isGameRunning || isAutoSpinning) //checks whether the reels are currently spinning
             return; //stops the bet from changing during a spin
 
         if (currentBet + betStep <= maximumBet && currentBet + betStep <= balance) //checks whether the next bet is within the maximum and affordable
@@ -303,7 +355,7 @@ public class SlotMachineManager : MonoBehaviour
 
     void DecreaseBet()
     {
-        if (isGameRunning) //checks whether the reels are currently spinning
+        if (isGameRunning || isAutoSpinning) //checks whether the reels are currently spinning
             return; //stops the bet from changing during a spin
 
         if (currentBet - betStep >= minimumBet) //checks whether the next bet stays above the minimum
@@ -317,23 +369,32 @@ public class SlotMachineManager : MonoBehaviour
     {
         balanceText.text = "Balance: " + balance; //updates the balance text whenever the player wins or loses coins
         betText.text = "Bet: " + currentBet; //updates the bet amount displayed on the screen
-        spinButton.interactable = !isGameRunning && balance >= currentBet; //disables the lever while the reels are moving or the player cannot afford the bet
-        increaseBetButton.interactable = !isGameRunning && currentBet + betStep <= maximumBet && currentBet + betStep <= balance; //disables Increase Bet when the next bet is too high or unaffordable
-        decreaseBetButton.interactable = !isGameRunning && currentBet - betStep >= minimumBet; //disables Decrease Bet when the player has already reached the minimum bet
+        spinButton.interactable = !isGameRunning && !isAutoSpinning && balance >= currentBet; //disables the lever while the reels are moving, auto spin is running or the player cannot afford the bet
+        increaseBetButton.interactable = !isGameRunning && !isAutoSpinning && currentBet + betStep <= maximumBet && currentBet + betStep <= balance; //disables Increase Bet during spins and auto spin, or when the next bet is too high or unaffordable
+        decreaseBetButton.interactable = !isGameRunning && !isAutoSpinning && currentBet - betStep >= minimumBet; //disables Decrease Bet during spins and auto spin, or when the bet is already at the minimum
+        if (isAutoSpinning) //runs this section while auto spin is active
+        {
+            autoSpinButton.interactable = !stopAutoSpin; //lets the player press stop, but not again once a stop has already been requested
+            autoSpinText.text = stopAutoSpin ? "STOPPING" : "STOP (" + autoSpinsLeft + ")"; //shows how many spins are left, or that auto spin is stopping
+        }
+        else //runs this section when auto spin is not active
+        {
+            autoSpinButton.interactable = !isGameRunning && balance >= currentBet; //lets the player start auto spin only when no spin is running and the bet is affordable
+            autoSpinText.text = "AUTO"; //shows the normal button label
+        }
     }
 
     void OnDestroy()
     {
         if (spinButton != null) //checks whether the lever button still exists
             spinButton.onClick.RemoveListener(Spin); //removes the Spin listener when this object is destroyed
-
         if (increaseBetButton != null) //checks whether the Increase Bet button still exists
             increaseBetButton.onClick.RemoveListener(IncreaseBet); //removes the Increase Bet listener when this object is destroyed
-
         if (decreaseBetButton != null) //checks whether the Decrease Bet button still exists
             decreaseBetButton.onClick.RemoveListener(DecreaseBet); //removes the Decrease Bet listener when this object is destroyed
-
         if (playAgainButton != null) //checks whether the Play Again button still exists
             playAgainButton.onClick.RemoveListener(RestartGame); //removes the Restart listener when this object is destroyed
+        if (autoSpinButton != null) //checks whether the auto spin button still exists
+            autoSpinButton.onClick.RemoveListener(ToggleAutoSpin); //removes the auto spin listener when this object is destroyed
     }
 }
