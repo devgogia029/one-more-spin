@@ -2,13 +2,17 @@
 
 A three-reel slot machine built in Unity for the slot game assignment. Choose a bet, pull the lever, and win by matching all three symbols on the middle row.
 
-**Play online:** https://devgogia029.github.io/one-more-spin/Build/WebGL/
+**Play online:**
+- itch.io: https://devgogia.itch.io/one-more-spin
+- GitHub Pages: https://devgogia029.github.io/one-more-spin/Build/WebGL/
 
-The build is about 15 MB, so the first load can be slow on a weak connection. Sound starts after your first click, because browsers block audio until then.
+**Gameplay clip:** [Docs/gameplay.mp4](Docs/gameplay.mp4), a 30-second recording in case the game is slow to load in Github Pages.
+
+The build is about 15 MB, so the first load can take some time on a slow connection. After that, the browser keeps a copy, so reloads are quick. Sound starts after your first click, because browsers block audio until then.
 
 ## Running the WebGL Build Locally
 
-The build won't run by double-clicking `index.html`, so it needs a small local server:
+Steps:
 
 1. Open a terminal in `Build/WebGL`
 2. Run `python -m http.server 8000`
@@ -37,7 +41,6 @@ All four symbols are equally likely, so a win comes up about once every 16 spins
 ## Bonus Features
 
 - **Auto Spin:** 10 automatic spins that can be stopped at any time
-- An animated lever in place of a Spin button
 - Sound effects and background music
 - The bet lowers by itself if you can no longer afford it
 
@@ -57,6 +60,7 @@ All four symbols are equally likely, so a win comes up about once every 16 spins
 - `Assets/UI`: artwork supplied for the assignment
 - `Assets/Sounds`: sound effects and music
 - `Build/WebGL`: the WebGL build
+- `Docs`: gameplay clip
 
 ## If I Had More Time
 
